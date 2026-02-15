@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fitness Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 600px;
+            margin: 0 auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+
+        .today-section {
+            background: #f9fafb;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .today-header {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-label {
+            display: block;
+            font-size: 0.95em;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .option-button {
+            flex: 1;
+            min-width: 120px;
+            padding: 15px 20px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            color: #666;
+        }
+
+        .option-button:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .option-button.selected {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+
+        .option-button.cardio.selected {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            border-color: #f59e0b;
+        }
+
+        .option-button.strength.selected {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border-color: #10b981;
+        }
+
+        .option-button.rest.selected {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            border-color: #6366f1;
+        }
+
+        .steps-input {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .steps-checkbox {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+        }
+
+        .steps-text {
+            font-size: 1em;
+            color: #333;
+        }
+
+        .save-button {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .save-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .save-button:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .view-tabs {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+            margin-bottom: 20px;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 12px;
+            background: #f3f4f6;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: 600;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tab-button.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .view-content {
+            display: none;
+        }
+
+        .view-content.active {
+            display: block;
+        }
+
+        .calendar {
+            margin-top: 20px;
+        }
+
+        .calendar-header {
+            font-size: 1.2em;
+            color: #333;
+            margin-bottom: 15px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .month-navigation {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .nav-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .nav-button:hover {
+            background: #5568d3;
+            transform: scale(1.1);
+        }
+
+        .nav-button:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .month-label {
+            font-size: 1.1em;
+            font-weight: 600;
+            min-width: 150px;
+            text-align: center;
+        }
+
+        .week-row {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .day-label {
+            text-align: center;
+            font-size: 0.8em;
+            color: #999;
+            font-weight: 600;
+            padding: 8px 0;
+        }
+
+        .day-cell {
+            aspect-ratio: 1;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85em;
+            font-weight: 600;
+            position: relative;
+            background: #f3f4f6;
+            color: #9ca3af;
+            padding: 5px;
+        }
+
+        .day-cell.has-data {
+            background: white;
+            border: 2px solid #e5e7eb;
+            color: #333;
+        }
+
+        .day-cell.today {
+            border: 3px solid #667eea;
+        }
+
+        .day-number {
+            font-size: 1em;
+            margin-bottom: 2px;
+        }
+
+        .day-icons {
+            display: flex;
+            gap: 3px;
+            font-size: 0.7em;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .icon-cardio { color: #f59e0b; }
+        .icon-strength { color: #10b981; }
+        .icon-rest { color: #6366f1; }
+        .icon-steps { color: #8b5cf6; }
+
+        .stats-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 15px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .reset-button {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .reset-button button {
+            background: none;
+            border: 2px solid #ef4444;
+            color: #ef4444;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .reset-button button:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        .completed-banner {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💪 Fitness Tracker</h1>
+        
+        <div class="today-section">
+            <div class="today-header" id="todayHeader">Today</div>
+            
+            <div id="completedBanner" class="completed-banner" style="display: none;">
+                ✓ Today's activity logged!
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">Workout Type</label>
+                <div class="button-group">
+                    <button class="option-button cardio" onclick="selectWorkoutType('cardio')">
+                        🏃 Cardio
+                    </button>
+                    <button class="option-button strength" onclick="selectWorkoutType('strength')">
+                        🏋️ Strength
+                    </button>
+                    <button class="option-button rest" onclick="selectWorkoutType('rest')">
+                        😌 Rest Day
+                    </button>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">Steps</label>
+                <div class="steps-input">
+                    <input type="checkbox" id="stepsCheckbox" class="steps-checkbox">
+                    <label for="stepsCheckbox" class="steps-text">Hit 7,000+ steps today</label>
+                </div>
+            </div>
+
+            <button class="save-button" onclick="saveToday()" id="saveButton">
+                Save Today
+            </button>
+        </div>
+
+        <div class="stats-section">
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-number" id="cardioCount">0</div>
+                    <div class="stat-label">Cardio Days (7d)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="strengthCount">0</div>
+                    <div class="stat-label">Strength Days (7d)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="stepsCount">0</div>
+                    <div class="stat-label">Days 7k+ Steps (7d)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="restCount">0</div>
+                    <div class="stat-label">Rest Days (7d)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="view-tabs">
+            <button class="tab-button active" onclick="switchView('weekly')">Weekly</button>
+            <button class="tab-button" onclick="switchView('monthly')">Monthly</button>
+        </div>
+
+        <div id="weeklyView" class="view-content active">
+            <div class="calendar">
+                <div class="calendar-header">Last 4 Weeks</div>
+                <div class="week-row">
+                    <div class="day-label">Sun</div>
+                    <div class="day-label">Mon</div>
+                    <div class="day-label">Tue</div>
+                    <div class="day-label">Wed</div>
+                    <div class="day-label">Thu</div>
+                    <div class="day-label">Fri</div>
+                    <div class="day-label">Sat</div>
+                </div>
+                <div id="calendarGrid"></div>
+            </div>
+        </div>
+
+        <div id="monthlyView" class="view-content">
+            <div class="calendar">
+                <div class="calendar-header">
+                    <div class="month-navigation">
+                        <button class="nav-button" onclick="changeMonth(-1)">‹</button>
+                        <div class="month-label" id="monthLabel"></div>
+                        <button class="nav-button" id="nextMonthBtn" onclick="changeMonth(1)">›</button>
+                    </div>
+                </div>
+                <div class="week-row">
+                    <div class="day-label">Sun</div>
+                    <div class="day-label">Mon</div>
+                    <div class="day-label">Tue</div>
+                    <div class="day-label">Wed</div>
+                    <div class="day-label">Thu</div>
+                    <div class="day-label">Fri</div>
+                    <div class="day-label">Sat</div>
+                </div>
+                <div id="monthlyCalendarGrid"></div>
+            </div>
+        </div>
+
+        <div class="reset-button">
+            <button onclick="resetData()">Reset All Data</button>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'fitnessTrackerData';
+        let selectedWorkoutType = null;
+        let currentViewMonth = new Date();
+
+        function getStoredData() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            return stored ? JSON.parse(stored) : {};
+        }
+
+        function saveData(data) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+
+        function getDateString(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        function getTodayString() {
+            return getDateString(new Date());
+        }
+
+        function selectWorkoutType(type) {
+            selectedWorkoutType = type;
+            
+            // Update button states
+            document.querySelectorAll('.option-button').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            event.target.classList.add('selected');
+        }
+
+        function saveToday() {
+            const data = getStoredData();
+            const today = getTodayString();
+            const steps = document.getElementById('stepsCheckbox').checked;
+
+            if (!selectedWorkoutType) {
+                alert('Please select a workout type!');
+                return;
+            }
+
+            data[today] = {
+                workoutType: selectedWorkoutType,
+                steps: steps
+            };
+
+            saveData(data);
+            selectedWorkoutType = null;
+            updateUI();
+        }
+
+        function switchView(view) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update view content
+            document.querySelectorAll('.view-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            if (view === 'weekly') {
+                document.getElementById('weeklyView').classList.add('active');
+            } else {
+                document.getElementById('monthlyView').classList.add('active');
+                currentViewMonth = new Date();
+                renderMonthlyCalendar();
+            }
+        }
+
+        function changeMonth(direction) {
+            currentViewMonth.setMonth(currentViewMonth.getMonth() + direction);
+            renderMonthlyCalendar();
+        }
+
+        function renderMonthlyCalendar() {
+            const data = getStoredData();
+            const grid = document.getElementById('monthlyCalendarGrid');
+            grid.innerHTML = '';
+
+            const year = currentViewMonth.getFullYear();
+            const month = currentViewMonth.getMonth();
+            
+            // Update month label
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                              'July', 'August', 'September', 'October', 'November', 'December'];
+            document.getElementById('monthLabel').textContent = `${monthNames[month]} ${year}`;
+
+            // Disable next month button if it's the current month
+            const today = new Date();
+            const nextMonthBtn = document.getElementById('nextMonthBtn');
+            if (year === today.getFullYear() && month === today.getMonth()) {
+                nextMonthBtn.disabled = true;
+            } else {
+                nextMonthBtn.disabled = false;
+            }
+
+            // Get first day of month and number of days
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const daysInMonth = lastDay.getDate();
+            const startingDayOfWeek = firstDay.getDay();
+
+            let currentRow = document.createElement('div');
+            currentRow.className = 'week-row';
+
+            // Add empty cells before first day
+            for (let i = 0; i < startingDayOfWeek; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'day-cell';
+                currentRow.appendChild(emptyCell);
+            }
+
+            // Add days of month
+            for (let day = 1; day <= daysInMonth; day++) {
+                const currentDate = new Date(year, month, day);
+                const dateStr = getDateString(currentDate);
+                const dayData = data[dateStr];
+                const isToday = dateStr === getTodayString();
+                const isFuture = currentDate > today;
+
+                const cell = document.createElement('div');
+                cell.className = 'day-cell';
+                
+                if (!isFuture && dayData) {
+                    cell.classList.add('has-data');
+                }
+                
+                if (isToday) {
+                    cell.classList.add('today');
+                }
+
+                const dayNumber = document.createElement('div');
+                dayNumber.className = 'day-number';
+                dayNumber.textContent = day;
+                cell.appendChild(dayNumber);
+
+                if (dayData) {
+                    const icons = document.createElement('div');
+                    icons.className = 'day-icons';
+                    
+                    if (dayData.workoutType === 'cardio') {
+                        icons.innerHTML += '<span class="icon-cardio">🏃</span>';
+                    } else if (dayData.workoutType === 'strength') {
+                        icons.innerHTML += '<span class="icon-strength">🏋️</span>';
+                    } else if (dayData.workoutType === 'rest') {
+                        icons.innerHTML += '<span class="icon-rest">😌</span>';
+                    }
+                    
+                    if (dayData.steps) {
+                        icons.innerHTML += '<span class="icon-steps">👟</span>';
+                    }
+                    
+                    cell.appendChild(icons);
+                }
+
+                currentRow.appendChild(cell);
+
+                // Start new row after Saturday
+                if ((startingDayOfWeek + day) % 7 === 0) {
+                    grid.appendChild(currentRow);
+                    currentRow = document.createElement('div');
+                    currentRow.className = 'week-row';
+                }
+            }
+
+            // Fill remaining cells in last row
+            if (currentRow.children.length > 0) {
+                while (currentRow.children.length < 7) {
+                    const emptyCell = document.createElement('div');
+                    emptyCell.className = 'day-cell';
+                    currentRow.appendChild(emptyCell);
+                }
+                grid.appendChild(currentRow);
+            }
+        }
+
+        function updateUI() {
+            const data = getStoredData();
+            const today = getTodayString();
+            const todayData = data[today];
+
+            // Update buttons and form
+            document.querySelectorAll('.option-button').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+
+            if (todayData) {
+                document.getElementById('completedBanner').style.display = 'block';
+                document.getElementById('stepsCheckbox').checked = todayData.steps;
+                
+                const button = document.querySelector(`.option-button.${todayData.workoutType}`);
+                if (button) {
+                    button.classList.add('selected');
+                    selectedWorkoutType = todayData.workoutType;
+                }
+            } else {
+                document.getElementById('completedBanner').style.display = 'none';
+                document.getElementById('stepsCheckbox').checked = false;
+            }
+
+            // Update stats (last 7 days)
+            const stats = calculateStats(7);
+            document.getElementById('cardioCount').textContent = stats.cardio;
+            document.getElementById('strengthCount').textContent = stats.strength;
+            document.getElementById('stepsCount').textContent = stats.steps;
+            document.getElementById('restCount').textContent = stats.rest;
+
+            // Update calendar
+            renderCalendar();
+            renderMonthlyCalendar();
+        }
+
+        function calculateStats(days) {
+            const data = getStoredData();
+            const today = new Date();
+            const stats = { cardio: 0, strength: 0, steps: 0, rest: 0 };
+
+            for (let i = 0; i < days; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() - i);
+                const dateStr = getDateString(date);
+                const dayData = data[dateStr];
+
+                if (dayData) {
+                    if (dayData.workoutType === 'cardio') stats.cardio++;
+                    if (dayData.workoutType === 'strength') stats.strength++;
+                    if (dayData.workoutType === 'rest') stats.rest++;
+                    if (dayData.steps) stats.steps++;
+                }
+            }
+
+            return stats;
+        }
+
+        function renderCalendar() {
+            const data = getStoredData();
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+
+            const today = new Date();
+            const startDate = new Date(today);
+            startDate.setDate(today.getDate() - 27); // Last 28 days
+
+            // Calculate starting position
+            const startDay = startDate.getDay();
+            
+            let currentRow = document.createElement('div');
+            currentRow.className = 'week-row';
+            
+            // Add empty cells for alignment
+            for (let i = 0; i < startDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'day-cell';
+                currentRow.appendChild(emptyCell);
+            }
+
+            // Add calendar days
+            for (let i = 0; i < 28; i++) {
+                const currentDate = new Date(startDate);
+                currentDate.setDate(startDate.getDate() + i);
+                const dateStr = getDateString(currentDate);
+                const dayData = data[dateStr];
+                const isToday = dateStr === getTodayString();
+
+                const cell = document.createElement('div');
+                cell.className = 'day-cell';
+                
+                if (dayData) {
+                    cell.classList.add('has-data');
+                }
+                
+                if (isToday) {
+                    cell.classList.add('today');
+                }
+
+                const dayNumber = document.createElement('div');
+                dayNumber.className = 'day-number';
+                dayNumber.textContent = currentDate.getDate();
+                cell.appendChild(dayNumber);
+
+                if (dayData) {
+                    const icons = document.createElement('div');
+                    icons.className = 'day-icons';
+                    
+                    if (dayData.workoutType === 'cardio') {
+                        icons.innerHTML += '<span class="icon-cardio">🏃</span>';
+                    } else if (dayData.workoutType === 'strength') {
+                        icons.innerHTML += '<span class="icon-strength">🏋️</span>';
+                    } else if (dayData.workoutType === 'rest') {
+                        icons.innerHTML += '<span class="icon-rest">😌</span>';
+                    }
+                    
+                    if (dayData.steps) {
+                        icons.innerHTML += '<span class="icon-steps">👟</span>';
+                    }
+                    
+                    cell.appendChild(icons);
+                }
+
+                currentRow.appendChild(cell);
+
+                // Start new row after Saturday
+                if ((startDay + i + 1) % 7 === 0) {
+                    grid.appendChild(currentRow);
+                    currentRow = document.createElement('div');
+                    currentRow.className = 'week-row';
+                }
+            }
+
+            // Append last row if it has cells
+            if (currentRow.children.length > 0) {
+                grid.appendChild(currentRow);
+            }
+        }
+
+        function resetData() {
+            if (confirm('Are you sure you want to reset all your fitness data? This cannot be undone.')) {
+                localStorage.removeItem(STORAGE_KEY);
+                selectedWorkoutType = null;
+                updateUI();
+            }
+        }
+
+        // Initialize on load
+        updateUI();
+    </script>
+</body>
+</html>
