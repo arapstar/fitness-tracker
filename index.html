@@ -48,6 +48,13 @@
             font-weight: 600;
         }
 
+        .editing-hint {
+            font-size: 0.8em;
+            font-weight: 400;
+            color: #888;
+            margin-top: 4px;
+        }
+
         .input-group {
             margin-bottom: 20px;
         }
@@ -237,8 +244,8 @@
         .week-row {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
-            gap: 8px;
-            margin-bottom: 8px;
+            gap: 5px;
+            margin-bottom: 5px;
         }
 
         .day-label {
@@ -250,6 +257,8 @@
         }
 
         .day-cell {
+            /* FIX: min-width: 0 prevents grid cells from blowing out due to content */
+            min-width: 0;
             aspect-ratio: 1;
             border-radius: 10px;
             display: flex;
@@ -261,7 +270,8 @@
             position: relative;
             background: #f3f4f6;
             color: #9ca3af;
-            padding: 5px;
+            padding: 4px 2px;
+            overflow: hidden;
         }
 
         .day-cell.has-data {
@@ -274,17 +284,50 @@
             border: 3px solid #667eea;
         }
 
+        .day-cell.future {
+            opacity: 0.4;
+            cursor: default !important;
+        }
+
+        /* Clickable past/present cells */
+        .day-cell.clickable {
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .day-cell.clickable:hover {
+            transform: scale(1.08);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            z-index: 1;
+        }
+
+        /* Currently selected day being edited */
+        .day-cell.editing {
+            border: 3px solid #f59e0b !important;
+            box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+        }
+
         .day-number {
-            font-size: 1em;
-            margin-bottom: 2px;
+            font-size: 0.95em;
+            margin-bottom: 1px;
+            line-height: 1;
         }
 
         .day-icons {
             display: flex;
-            gap: 3px;
+            gap: 1px;
             font-size: 0.7em;
             flex-wrap: wrap;
             justify-content: center;
+            /* FIX: constrain icons so they never push cell width */
+            width: 100%;
+            max-width: 100%;
+            overflow: hidden;
+        }
+
+        .day-icons span {
+            display: inline-block;
+            line-height: 1;
         }
 
         .icon-cardio { color: #f59e0b; }
@@ -361,22 +404,25 @@
         <h1>💪 Fitness Tracker</h1>
         
         <div class="today-section">
-            <div class="today-header" id="todayHeader">Today</div>
+            <div class="today-header" id="todayHeader">
+                Today
+                <div class="editing-hint" id="editingHint" style="display:none;">Tap any day on the calendar to edit it</div>
+            </div>
             
             <div id="completedBanner" class="completed-banner" style="display: none;">
-                ✓ Today's activity logged!
+                ✓ Activity logged!
             </div>
 
             <div class="input-group">
                 <label class="input-label">Workout Type</label>
                 <div class="button-group">
-                    <button class="option-button cardio" onclick="selectWorkoutType('cardio')">
+                    <button class="option-button cardio" onclick="selectWorkoutType('cardio', this)">
                         🏃 Cardio
                     </button>
-                    <button class="option-button strength" onclick="selectWorkoutType('strength')">
+                    <button class="option-button strength" onclick="selectWorkoutType('strength', this)">
                         🏋️ Strength
                     </button>
-                    <button class="option-button rest" onclick="selectWorkoutType('rest')">
+                    <button class="option-button rest" onclick="selectWorkoutType('rest', this)">
                         😌 Rest Day
                     </button>
                 </div>
@@ -390,7 +436,7 @@
                 </div>
             </div>
 
-            <button class="save-button" onclick="saveToday()" id="saveButton">
+            <button class="save-button" onclick="saveEntry()" id="saveButton">
                 Save Today
             </button>
         </div>
@@ -417,8 +463,8 @@
         </div>
 
         <div class="view-tabs">
-            <button class="tab-button active" onclick="switchView('weekly')">Weekly</button>
-            <button class="tab-button" onclick="switchView('monthly')">Monthly</button>
+            <button class="tab-button active" onclick="switchView('weekly', this)">Weekly</button>
+            <button class="tab-button" onclick="switchView('monthly', this)">Monthly</button>
         </div>
 
         <div id="weeklyView" class="view-content active">
@@ -468,6 +514,8 @@
         const STORAGE_KEY = 'fitnessTrackerData';
         let selectedWorkoutType = null;
         let currentViewMonth = new Date();
+        // Track which date is currently loaded in the editor (defaults to today)
+        let editingDateStr = getTodayString();
 
         function getStoredData() {
             const stored = localStorage.getItem(STORAGE_KEY);
@@ -479,54 +527,93 @@
         }
 
         function getDateString(date) {
-            return date.toISOString().split('T')[0];
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
         }
 
         function getTodayString() {
             return getDateString(new Date());
         }
 
-        function selectWorkoutType(type) {
-            selectedWorkoutType = type;
-            
-            // Update button states
-            document.querySelectorAll('.option-button').forEach(btn => {
-                btn.classList.remove('selected');
-            });
-            event.target.classList.add('selected');
+        function formatDateForHeader(dateStr) {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const date = new Date(y, m - 1, d);
+            const today = getTodayString();
+            if (dateStr === today) return 'Today';
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            if (dateStr === getDateString(yesterday)) return 'Yesterday';
+            return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
         }
 
-        function saveToday() {
-            const data = getStoredData();
-            const today = getTodayString();
-            const steps = document.getElementById('stepsCheckbox').checked;
+        function selectWorkoutType(type, btn) {
+            selectedWorkoutType = type;
+            document.querySelectorAll('.option-button').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+        }
 
+        // Load a date's data into the editor form
+        function loadDateIntoEditor(dateStr) {
+            editingDateStr = dateStr;
+            const data = getStoredData();
+            const entry = data[dateStr];
+
+            // Update header
+            document.getElementById('todayHeader').childNodes[0].textContent = formatDateForHeader(dateStr);
+            document.getElementById('editingHint').style.display = 'block';
+
+            // Update save button label
+            const isToday = dateStr === getTodayString();
+            document.getElementById('saveButton').textContent = isToday ? 'Save Today' : 'Save Entry';
+
+            // Reset form
+            selectedWorkoutType = null;
+            document.querySelectorAll('.option-button').forEach(b => b.classList.remove('selected'));
+            document.getElementById('stepsCheckbox').checked = false;
+
+            if (entry) {
+                document.getElementById('completedBanner').style.display = 'block';
+                document.getElementById('stepsCheckbox').checked = entry.steps;
+                selectedWorkoutType = entry.workoutType;
+                const btn = document.querySelector(`.option-button.${entry.workoutType}`);
+                if (btn) btn.classList.add('selected');
+            } else {
+                document.getElementById('completedBanner').style.display = 'none';
+            }
+
+            // Redraw calendars to highlight the selected date
+            renderCalendar();
+            renderMonthlyCalendar();
+
+            // Scroll up to editor
+            document.querySelector('.today-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function saveEntry() {
             if (!selectedWorkoutType) {
                 alert('Please select a workout type!');
                 return;
             }
 
-            data[today] = {
+            const data = getStoredData();
+            const steps = document.getElementById('stepsCheckbox').checked;
+
+            data[editingDateStr] = {
                 workoutType: selectedWorkoutType,
                 steps: steps
             };
 
             saveData(data);
-            selectedWorkoutType = null;
             updateUI();
         }
 
-        function switchView(view) {
-            // Update tab buttons
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
+        function switchView(view, btn) {
+            document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
 
-            // Update view content
-            document.querySelectorAll('.view-content').forEach(content => {
-                content.classList.remove('active');
-            });
+            document.querySelectorAll('.view-content').forEach(c => c.classList.remove('active'));
 
             if (view === 'weekly') {
                 document.getElementById('weeklyView').classList.add('active');
@@ -542,140 +629,172 @@
             renderMonthlyCalendar();
         }
 
-        function renderMonthlyCalendar() {
+        function buildDayCell(dateStr, dayNumber, isFuture) {
             const data = getStoredData();
+            const dayData = data[dateStr];
+            const isToday = dateStr === getTodayString();
+            const isEditing = dateStr === editingDateStr;
+
+            const cell = document.createElement('div');
+            cell.className = 'day-cell';
+
+            if (dayData) cell.classList.add('has-data');
+            if (isToday) cell.classList.add('today');
+            if (isEditing) cell.classList.add('editing');
+
+            if (!isFuture) {
+                cell.classList.add('clickable');
+                cell.onclick = () => loadDateIntoEditor(dateStr);
+            } else {
+                cell.classList.add('future');
+            }
+
+            const num = document.createElement('div');
+            num.className = 'day-number';
+            num.textContent = dayNumber;
+            cell.appendChild(num);
+
+            if (dayData) {
+                const icons = document.createElement('div');
+                icons.className = 'day-icons';
+
+                if (dayData.workoutType === 'cardio') {
+                    icons.innerHTML += '<span class="icon-cardio">🏃</span>';
+                } else if (dayData.workoutType === 'strength') {
+                    icons.innerHTML += '<span class="icon-strength">🏋️</span>';
+                } else if (dayData.workoutType === 'rest') {
+                    icons.innerHTML += '<span class="icon-rest">😌</span>';
+                }
+
+                if (dayData.steps) {
+                    icons.innerHTML += '<span class="icon-steps">👟</span>';
+                }
+
+                cell.appendChild(icons);
+            }
+
+            return cell;
+        }
+
+        function renderMonthlyCalendar() {
             const grid = document.getElementById('monthlyCalendarGrid');
             grid.innerHTML = '';
 
+            const today = new Date();
             const year = currentViewMonth.getFullYear();
             const month = currentViewMonth.getMonth();
-            
-            // Update month label
+
             const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
                               'July', 'August', 'September', 'October', 'November', 'December'];
             document.getElementById('monthLabel').textContent = `${monthNames[month]} ${year}`;
 
-            // Disable next month button if it's the current month
-            const today = new Date();
             const nextMonthBtn = document.getElementById('nextMonthBtn');
-            if (year === today.getFullYear() && month === today.getMonth()) {
-                nextMonthBtn.disabled = true;
-            } else {
-                nextMonthBtn.disabled = false;
-            }
+            nextMonthBtn.disabled = (year === today.getFullYear() && month === today.getMonth());
 
-            // Get first day of month and number of days
-            const firstDay = new Date(year, month, 1);
-            const lastDay = new Date(year, month + 1, 0);
-            const daysInMonth = lastDay.getDate();
-            const startingDayOfWeek = firstDay.getDay();
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
 
             let currentRow = document.createElement('div');
             currentRow.className = 'week-row';
 
-            // Add empty cells before first day
-            for (let i = 0; i < startingDayOfWeek; i++) {
-                const emptyCell = document.createElement('div');
-                emptyCell.className = 'day-cell';
-                currentRow.appendChild(emptyCell);
+            for (let i = 0; i < firstDay; i++) {
+                const empty = document.createElement('div');
+                empty.className = 'day-cell';
+                currentRow.appendChild(empty);
             }
 
-            // Add days of month
             for (let day = 1; day <= daysInMonth; day++) {
                 const currentDate = new Date(year, month, day);
                 const dateStr = getDateString(currentDate);
-                const dayData = data[dateStr];
-                const isToday = dateStr === getTodayString();
-                const isFuture = currentDate > today;
+                const isFuture = currentDate > today && dateStr !== getTodayString();
 
-                const cell = document.createElement('div');
-                cell.className = 'day-cell';
-                
-                if (!isFuture && dayData) {
-                    cell.classList.add('has-data');
-                }
-                
-                if (isToday) {
-                    cell.classList.add('today');
-                }
+                currentRow.appendChild(buildDayCell(dateStr, day, isFuture));
 
-                const dayNumber = document.createElement('div');
-                dayNumber.className = 'day-number';
-                dayNumber.textContent = day;
-                cell.appendChild(dayNumber);
-
-                if (dayData) {
-                    const icons = document.createElement('div');
-                    icons.className = 'day-icons';
-                    
-                    if (dayData.workoutType === 'cardio') {
-                        icons.innerHTML += '<span class="icon-cardio">🏃</span>';
-                    } else if (dayData.workoutType === 'strength') {
-                        icons.innerHTML += '<span class="icon-strength">🏋️</span>';
-                    } else if (dayData.workoutType === 'rest') {
-                        icons.innerHTML += '<span class="icon-rest">😌</span>';
-                    }
-                    
-                    if (dayData.steps) {
-                        icons.innerHTML += '<span class="icon-steps">👟</span>';
-                    }
-                    
-                    cell.appendChild(icons);
-                }
-
-                currentRow.appendChild(cell);
-
-                // Start new row after Saturday
-                if ((startingDayOfWeek + day) % 7 === 0) {
+                if ((firstDay + day) % 7 === 0) {
                     grid.appendChild(currentRow);
                     currentRow = document.createElement('div');
                     currentRow.className = 'week-row';
                 }
             }
 
-            // Fill remaining cells in last row
             if (currentRow.children.length > 0) {
                 while (currentRow.children.length < 7) {
-                    const emptyCell = document.createElement('div');
-                    emptyCell.className = 'day-cell';
-                    currentRow.appendChild(emptyCell);
+                    const empty = document.createElement('div');
+                    empty.className = 'day-cell';
+                    currentRow.appendChild(empty);
                 }
+                grid.appendChild(currentRow);
+            }
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+
+            const today = new Date();
+            const startDate = new Date(today);
+            startDate.setDate(today.getDate() - 27);
+
+            const startDay = startDate.getDay();
+
+            let currentRow = document.createElement('div');
+            currentRow.className = 'week-row';
+
+            for (let i = 0; i < startDay; i++) {
+                const empty = document.createElement('div');
+                empty.className = 'day-cell';
+                currentRow.appendChild(empty);
+            }
+
+            for (let i = 0; i < 28; i++) {
+                const currentDate = new Date(startDate);
+                currentDate.setDate(startDate.getDate() + i);
+                const dateStr = getDateString(currentDate);
+
+                currentRow.appendChild(buildDayCell(dateStr, currentDate.getDate(), false));
+
+                if ((startDay + i + 1) % 7 === 0) {
+                    grid.appendChild(currentRow);
+                    currentRow = document.createElement('div');
+                    currentRow.className = 'week-row';
+                }
+            }
+
+            if (currentRow.children.length > 0) {
                 grid.appendChild(currentRow);
             }
         }
 
         function updateUI() {
             const data = getStoredData();
-            const today = getTodayString();
-            const todayData = data[today];
+            const entry = data[editingDateStr];
 
-            // Update buttons and form
-            document.querySelectorAll('.option-button').forEach(btn => {
-                btn.classList.remove('selected');
-            });
+            // Update form to reflect current editing date
+            document.getElementById('todayHeader').childNodes[0].textContent = formatDateForHeader(editingDateStr);
+            const isToday = editingDateStr === getTodayString();
+            document.getElementById('saveButton').textContent = isToday ? 'Save Today' : 'Save Entry';
 
-            if (todayData) {
+            document.querySelectorAll('.option-button').forEach(b => b.classList.remove('selected'));
+            selectedWorkoutType = null;
+
+            if (entry) {
                 document.getElementById('completedBanner').style.display = 'block';
-                document.getElementById('stepsCheckbox').checked = todayData.steps;
-                
-                const button = document.querySelector(`.option-button.${todayData.workoutType}`);
-                if (button) {
-                    button.classList.add('selected');
-                    selectedWorkoutType = todayData.workoutType;
-                }
+                document.getElementById('stepsCheckbox').checked = entry.steps;
+                selectedWorkoutType = entry.workoutType;
+                const btn = document.querySelector(`.option-button.${entry.workoutType}`);
+                if (btn) btn.classList.add('selected');
             } else {
                 document.getElementById('completedBanner').style.display = 'none';
                 document.getElementById('stepsCheckbox').checked = false;
             }
 
-            // Update stats (last 7 days)
+            // Stats
             const stats = calculateStats(7);
             document.getElementById('cardioCount').textContent = stats.cardio;
             document.getElementById('strengthCount').textContent = stats.strength;
             document.getElementById('stepsCount').textContent = stats.steps;
             document.getElementById('restCount').textContent = stats.rest;
 
-            // Update calendar
             renderCalendar();
             renderMonthlyCalendar();
         }
@@ -702,96 +821,19 @@
             return stats;
         }
 
-        function renderCalendar() {
-            const data = getStoredData();
-            const grid = document.getElementById('calendarGrid');
-            grid.innerHTML = '';
-
-            const today = new Date();
-            const startDate = new Date(today);
-            startDate.setDate(today.getDate() - 27); // Last 28 days
-
-            // Calculate starting position
-            const startDay = startDate.getDay();
-            
-            let currentRow = document.createElement('div');
-            currentRow.className = 'week-row';
-            
-            // Add empty cells for alignment
-            for (let i = 0; i < startDay; i++) {
-                const emptyCell = document.createElement('div');
-                emptyCell.className = 'day-cell';
-                currentRow.appendChild(emptyCell);
-            }
-
-            // Add calendar days
-            for (let i = 0; i < 28; i++) {
-                const currentDate = new Date(startDate);
-                currentDate.setDate(startDate.getDate() + i);
-                const dateStr = getDateString(currentDate);
-                const dayData = data[dateStr];
-                const isToday = dateStr === getTodayString();
-
-                const cell = document.createElement('div');
-                cell.className = 'day-cell';
-                
-                if (dayData) {
-                    cell.classList.add('has-data');
-                }
-                
-                if (isToday) {
-                    cell.classList.add('today');
-                }
-
-                const dayNumber = document.createElement('div');
-                dayNumber.className = 'day-number';
-                dayNumber.textContent = currentDate.getDate();
-                cell.appendChild(dayNumber);
-
-                if (dayData) {
-                    const icons = document.createElement('div');
-                    icons.className = 'day-icons';
-                    
-                    if (dayData.workoutType === 'cardio') {
-                        icons.innerHTML += '<span class="icon-cardio">🏃</span>';
-                    } else if (dayData.workoutType === 'strength') {
-                        icons.innerHTML += '<span class="icon-strength">🏋️</span>';
-                    } else if (dayData.workoutType === 'rest') {
-                        icons.innerHTML += '<span class="icon-rest">😌</span>';
-                    }
-                    
-                    if (dayData.steps) {
-                        icons.innerHTML += '<span class="icon-steps">👟</span>';
-                    }
-                    
-                    cell.appendChild(icons);
-                }
-
-                currentRow.appendChild(cell);
-
-                // Start new row after Saturday
-                if ((startDay + i + 1) % 7 === 0) {
-                    grid.appendChild(currentRow);
-                    currentRow = document.createElement('div');
-                    currentRow.className = 'week-row';
-                }
-            }
-
-            // Append last row if it has cells
-            if (currentRow.children.length > 0) {
-                grid.appendChild(currentRow);
-            }
-        }
-
         function resetData() {
             if (confirm('Are you sure you want to reset all your fitness data? This cannot be undone.')) {
                 localStorage.removeItem(STORAGE_KEY);
                 selectedWorkoutType = null;
+                editingDateStr = getTodayString();
                 updateUI();
             }
         }
 
-        // Initialize on load
+        // Set the editing hint visible on load since it's always useful to know
+        document.getElementById('editingHint').style.display = 'block';
+
+        // Initialize
         updateUI();
     </script>
 </body>
