@@ -271,7 +271,8 @@
             background: #f3f4f6;
             color: #9ca3af;
             padding: 4px 2px;
-            overflow: hidden;
+            /* overflow must be visible so a second emoji row isn't clipped off */
+            overflow: visible;
         }
 
         .day-cell.has-data {
@@ -316,12 +317,13 @@
         .day-icons {
             display: flex;
             gap: 1px;
-            font-size: 0.7em;
-            flex-wrap: wrap;
+            /* Never wrap — both emojis must always appear on one line */
+            flex-wrap: nowrap;
             justify-content: center;
-            /* FIX: constrain icons so they never push cell width */
             width: 100%;
-            max-width: 100%;
+            /* Scale down slightly so two emojis fit comfortably in any cell size */
+            font-size: 0.62em;
+            line-height: 1;
             overflow: hidden;
         }
 
