@@ -397,15 +397,58 @@
             font-weight: 600;
             margin-bottom: 20px;
         }
+
+        /* Save toast — briefly flashes to confirm what was saved */
+        .save-toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: #111827;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 0.95em;
+            font-weight: 600;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            z-index: 1000;
+            white-space: nowrap;
+        }
+
+        .save-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Dim the editor when a past date is loaded so it's obvious you're editing history */
+        .today-section.editing-past {
+            outline: 2px dashed #f59e0b;
+            outline-offset: -2px;
+        }
+
+        .editing-date-label {
+            display: inline-block;
+            font-size: 0.75em;
+            font-weight: 600;
+            background: #f59e0b;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 20px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>💪 Fitness Tracker</h1>
         
-        <div class="today-section">
+        <div class="today-section" id="todaySection">
             <div class="today-header" id="todayHeader">
-                Today
+                <span id="headerDateLabel">Today</span>
+                <span class="editing-date-label" id="editingBadge" style="display:none;">editing past</span>
                 <div class="editing-hint" id="editingHint" style="display:none;">Tap any day on the calendar to edit it</div>
             </div>
             
@@ -510,11 +553,13 @@
         </div>
     </div>
 
+    <div class="save-toast" id="saveToast"></div>
+
     <script>
         const STORAGE_KEY = 'fitnessTrackerData';
+        const MIGRATION_KEY = 'ftMigrated_v2';
         let selectedWorkoutType = null;
         let currentViewMonth = new Date();
-        // Track which date is currently loaded in the editor (defaults to today)
         let editingDateStr = getTodayString();
 
         function getStoredData() {
@@ -526,6 +571,7 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         }
 
+        // Always use local date — never UTC — so midnight doesn't flip to "tomorrow"
         function getDateString(date) {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -535,6 +581,29 @@
 
         function getTodayString() {
             return getDateString(new Date());
+        }
+
+        // One-time migration: the original app used toISOString() (UTC), so entries saved
+        // after ~7–8pm in US timezones were stored under the NEXT day's date.
+        // This shifts those entries back to the correct local date.
+        function migrateTimezone() {
+            if (localStorage.getItem(MIGRATION_KEY)) return;
+            const data = getStoredData();
+            let changed = false;
+            Object.keys(data).forEach(key => {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return;
+                // Interpret old key as UTC midnight (how toISOString stored it)
+                const utcMidnight = new Date(key + 'T00:00:00Z');
+                const localKey = getDateString(utcMidnight);
+                // If local date differs and the local slot is empty, move the entry
+                if (localKey !== key && !data[localKey]) {
+                    data[localKey] = data[key];
+                    delete data[key];
+                    changed = true;
+                }
+            });
+            if (changed) saveData(data);
+            localStorage.setItem(MIGRATION_KEY, '1');
         }
 
         function formatDateForHeader(dateStr) {
@@ -556,16 +625,22 @@
 
         // Load a date's data into the editor form
         function loadDateIntoEditor(dateStr) {
+            // If the user taps the date that's already loaded, do nothing —
+            // avoids accidental form resets when scrolling past calendar cells on mobile
+            if (dateStr === editingDateStr) return;
+
             editingDateStr = dateStr;
             const data = getStoredData();
             const entry = data[dateStr];
+            const isToday = dateStr === getTodayString();
 
             // Update header
-            document.getElementById('todayHeader').childNodes[0].textContent = formatDateForHeader(dateStr);
+            document.getElementById('headerDateLabel').textContent = formatDateForHeader(dateStr);
+            document.getElementById('editingBadge').style.display = isToday ? 'none' : 'inline-block';
             document.getElementById('editingHint').style.display = 'block';
+            document.getElementById('todaySection').classList.toggle('editing-past', !isToday);
 
             // Update save button label
-            const isToday = dateStr === getTodayString();
             document.getElementById('saveButton').textContent = isToday ? 'Save Today' : 'Save Entry';
 
             // Reset form
@@ -591,6 +666,13 @@
             document.querySelector('.today-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
+        function showToast(msg) {
+            const toast = document.getElementById('saveToast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
         function saveEntry() {
             if (!selectedWorkoutType) {
                 alert('Please select a workout type!');
@@ -598,6 +680,7 @@
             }
 
             const data = getStoredData();
+            // Read steps BEFORE any UI refresh so we capture exact checkbox state at click time
             const steps = document.getElementById('stepsCheckbox').checked;
 
             data[editingDateStr] = {
@@ -606,7 +689,29 @@
             };
 
             saveData(data);
-            updateUI();
+
+            // Show the completed banner for the current date
+            document.getElementById('completedBanner').style.display = 'block';
+
+            // Toast confirms exactly what was saved
+            const workoutLabel = { cardio: '🏃 Cardio', strength: '🏋️ Strength', rest: '😌 Rest Day' }[selectedWorkoutType];
+            const stepsLabel = steps ? ' + 👟 Steps' : '';
+            const dateLabel = editingDateStr === getTodayString() ? 'Today' : formatDateForHeader(editingDateStr);
+            showToast(`Saved ${dateLabel}: ${workoutLabel}${stepsLabel}`);
+
+            // Only re-render calendars — do NOT reset selectedWorkoutType or the form,
+            // so the user can see exactly what was saved and make further edits if needed
+            const stats = calculateStats(7);
+            document.getElementById('cardioCount').textContent = stats.cardio;
+            document.getElementById('strengthCount').textContent = stats.strength;
+            document.getElementById('stepsCount').textContent = stats.steps;
+            document.getElementById('restCount').textContent = stats.rest;
+            renderCalendar();
+            // BUG FIX: only re-render monthly if it's the visible tab, and use the CURRENT
+            // displayed month (not a reset to today) so navigating to past months isn't disrupted
+            if (document.getElementById('monthlyView').classList.contains('active')) {
+                renderMonthlyCalendar();
+            }
         }
 
         function switchView(view, btn) {
@@ -629,8 +734,7 @@
             renderMonthlyCalendar();
         }
 
-        function buildDayCell(dateStr, dayNumber, isFuture) {
-            const data = getStoredData();
+        function buildDayCell(dateStr, dayNumber, isFuture, data) {
             const dayData = data[dateStr];
             const isToday = dateStr === getTodayString();
             const isEditing = dateStr === editingDateStr;
@@ -638,7 +742,7 @@
             const cell = document.createElement('div');
             cell.className = 'day-cell';
 
-            if (dayData) cell.classList.add('has-data');
+            if (dayData && !isFuture) cell.classList.add('has-data');
             if (isToday) cell.classList.add('today');
             if (isEditing) cell.classList.add('editing');
 
@@ -680,6 +784,7 @@
             const grid = document.getElementById('monthlyCalendarGrid');
             grid.innerHTML = '';
 
+            const data = getStoredData();
             const today = new Date();
             const year = currentViewMonth.getFullYear();
             const month = currentViewMonth.getMonth();
@@ -708,7 +813,7 @@
                 const dateStr = getDateString(currentDate);
                 const isFuture = currentDate > today && dateStr !== getTodayString();
 
-                currentRow.appendChild(buildDayCell(dateStr, day, isFuture));
+                currentRow.appendChild(buildDayCell(dateStr, day, isFuture, data));
 
                 if ((firstDay + day) % 7 === 0) {
                     grid.appendChild(currentRow);
@@ -731,6 +836,7 @@
             const grid = document.getElementById('calendarGrid');
             grid.innerHTML = '';
 
+            const data = getStoredData();
             const today = new Date();
             const startDate = new Date(today);
             startDate.setDate(today.getDate() - 27);
@@ -751,7 +857,7 @@
                 currentDate.setDate(startDate.getDate() + i);
                 const dateStr = getDateString(currentDate);
 
-                currentRow.appendChild(buildDayCell(dateStr, currentDate.getDate(), false));
+                currentRow.appendChild(buildDayCell(dateStr, currentDate.getDate(), false, data));
 
                 if ((startDay + i + 1) % 7 === 0) {
                     grid.appendChild(currentRow);
@@ -768,10 +874,13 @@
         function updateUI() {
             const data = getStoredData();
             const entry = data[editingDateStr];
-
-            // Update form to reflect current editing date
-            document.getElementById('todayHeader').childNodes[0].textContent = formatDateForHeader(editingDateStr);
             const isToday = editingDateStr === getTodayString();
+
+            // Update form header
+            document.getElementById('headerDateLabel').textContent = formatDateForHeader(editingDateStr);
+            document.getElementById('editingBadge').style.display = isToday ? 'none' : 'inline-block';
+            document.getElementById('editingHint').style.display = 'block';
+            document.getElementById('todaySection').classList.toggle('editing-past', !isToday);
             document.getElementById('saveButton').textContent = isToday ? 'Save Today' : 'Save Entry';
 
             document.querySelectorAll('.option-button').forEach(b => b.classList.remove('selected'));
@@ -833,7 +942,8 @@
         // Set the editing hint visible on load since it's always useful to know
         document.getElementById('editingHint').style.display = 'block';
 
-        // Initialize
+        // Migrate old UTC-keyed data to local dates, then initialize
+        migrateTimezone();
         updateUI();
     </script>
 </body>
